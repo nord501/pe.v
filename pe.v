@@ -29,8 +29,8 @@ struct IMAGE_DATA_DIRECTORY {
 
 struct IMAGE_FILE_HEADER {
 	machine                  u16
-	number_of_sections	     u16
-	time_date_stamp		     u32
+	number_of_sections       u16
+	time_date_stamp          u32
 	pointer_to_symbol_table  u32
 	number_of_symbols        u32
 	size_of_optional_header  u16
@@ -74,22 +74,39 @@ struct IMAGE_NT_HEADERS64 {
 	signature        u32
 	file_header      IMAGE_FILE_HEADER
 	optional_header  IMAGE_OPTIONAL_HEADER64
-} 
+}
+
+struct IMAGE_SECTION_HEADER {
+	name[8]                 byte
+	virtual_size            u32
+	virtual_address         u32
+	size_of_raw_data        u32
+	pointer_to_raw_data     u32
+	pointer_to_relocations  u32
+	pointer_to_linenumbers  u32
+	number_of_relocations   u16
+	number_of_linenumbers   u16
+	characteristics         u32
+}
+
+const (
+	number_of_sections = 3
+)
 
 fn main() {
 	dos_header := IMAGE_DOS_HEADER {
 		e_magic:  0x5A4D       // MZ
-		e_lfanew: 0x80         // Pointer to PE Header
+		e_lfanew: 0x80         // PE Header address
 	}
 
 	optional_header := IMAGE_OPTIONAL_HEADER64 {
-		size_of_code: 1
+		size_of_code: 0x1000
 	}
 
 	// op_len := sizeof(optional_header)
 	file_header := IMAGE_FILE_HEADER {
-		machine: 0x8664        // x64
-		number_of_sections: 1  // one for now
+		machine: 0x8664                        // x64
+		number_of_sections: number_of_sections // .text, .data, .idata
 		size_of_optional_header: u16(sizeof(optional_header))
 	}
 
@@ -113,5 +130,27 @@ fn main() {
 	f.write_bytes(&pe_signature, 4)
 	f.write_bytes(&file_header, int(sizeof(file_header)))
 	f.write_bytes(&optional_header, int(sizeof(optional_header)))
+
+	// code section
+	mut name := [8]byte
+	name[0] = `.`
+	name[1] = `t`
+	name[2] = `e`
+	name[3] = `x`
+	name[4] = `t`
+	name[5] = 0
+
+	text_section := IMAGE_SECTION_HEADER {
+		name: name
+		virtual_size: 0x1000
+		virtual_address: 0x1000
+		size_of_raw_data: 0x1000
+		pointer_to_raw_data: 0x1000
+	}
+
+	f.write_bytes(&text_section, int(sizeof(text_section)))
+
+	println(int(sizeof(optional_header)))
+
 	f.close()
 }
