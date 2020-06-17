@@ -132,7 +132,7 @@ fn main() {
 		size_of_headers: 0x200
 		check_sum: 0x0000 // calculate
 		subsystem: 0x003  // console
-		dll_characteristics: 0x0000 // this is not an EXE file
+		dll_characteristics: 0x0000 // this is an EXE file
 		size_of_stack_reserve: 0x100000
 		size_of_stack_commit: 0x1000
 		size_of_heap_reserve: 0x100000
@@ -161,13 +161,7 @@ fn main() {
 	}
 	
 	// code section
-	mut name := [8]byte
-	name[0] = `.`
-	name[1] = `t`
-	name[2] = `e`
-	name[3] = `x`
-	name[4] = `t`
-	name[5] = 0
+	text := [`.`, `t`, `e`, `x`, `t`, 0, 0, 0]
 
 	text_header := IMAGE_SECTION_HEADER {
 		// name: name
@@ -177,14 +171,9 @@ fn main() {
 		pointer_to_raw_data: 0x200
 		characteristics: 0x60000020 // executable, readable, contains code
 	}
-	C.memcpy( text_header.name, name, 6)
+	C.memcpy(text_header.name, &text[0], 8)
 
-	name[0] = `.`
-	name[1] = `d`
-	name[2] = `a`
-	name[3] = `t`
-	name[4] = `a`
-	name[5] = 0
+	data := [`.`, `d`, `a`, `t`, `a`, 0, 0, 0]
 
 	data_header := IMAGE_SECTION_HEADER {
 		// name: name
@@ -194,15 +183,9 @@ fn main() {
 		pointer_to_raw_data: 0x400
 		characteristics: 0xC0000040 // readable, writable, contains initialized data
 	}
-	C.memcpy( data_header.name, name, 6)
+	C.memcpy(data_header.name, &data[0], 8)
 
-	name[0] = `.`
-	name[1] = `i`
-	name[2] = `d`
-	name[3] = `a`
-	name[4] = `t`
-	name[5] = `a`
-	name[6] = 0
+	idata := [`.`, `i`,`d`, `a`, `t`, `a`, 0, 0]
 
 	idata_header := IMAGE_SECTION_HEADER {
 		// name: name
@@ -212,7 +195,7 @@ fn main() {
 		pointer_to_raw_data: 0x600
 		characteristics: 0xC0000040 // readable, contains initialized data
 	}
-	C.memcpy( idata_header.name, name, 7)
+	C.memcpy(idata_header.name, &idata[0], 8)
 
 	// https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_data_directory
 	// TODO: calculate all address & size
