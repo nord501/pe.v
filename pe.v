@@ -92,6 +92,19 @@ struct IMAGE_SECTION_HEADER {
 	characteristics         u32
 }
 
+struct IMAGE_IMPORT_DESCRIPTOR {
+	original_first_thunk  u32   /* RVA to original unbound IAT */
+	time_date_stamp       u32
+	forwarder_chain       u32   /* -1 if no forwarders */
+	name                  u32
+	first_thunk           u32  /* RVA to IAT (if bound this IAT has actual addresses) */
+}
+
+struct Import {
+	dll_name   string // kernel32.dll, msvcrt.dll
+	api        []string    // 
+}
+
 const (
 	number_of_sections = 3
 )
@@ -201,18 +214,67 @@ fn main() {
 	// TODO: calculate all address & size
 	import_table_dir_size := 0x3c  
 	import_table_dir := IMAGE_DATA_DIRECTORY {
-		virtual_address: 0x1234
+		virtual_address: 0x2000
 		size: u32(import_table_dir_size)
 	}
 	C.memcpy(&optional_header.data_directory[1], &import_table_dir, sizeof(import_table_dir))
 
 	import_address_table_size := 0x60  
 	import_address_table_dir := IMAGE_DATA_DIRECTORY {
-		virtual_address: 0x1234
+		virtual_address: 0x2200
 		size: u32(import_address_table_size)
 	}
 	C.memcpy(&optional_header.data_directory[12], &import_address_table_dir, sizeof(import_address_table_dir))
 
+	kernel32_desc := IMAGE_IMPORT_DESCRIPTOR {
+		original_first_thunk: 0x2100   /* RVA to original unbound IAT */
+		time_date_stamp:      0x0000
+		forwarder_chain:      0x0000   /* -1 if no forwarders */
+		name:                 0x2100
+		first_thunk:          0x2100   /* RVA to IAT (if bound this IAT has actual addresses) */
+	}
+
+	msvcrt_desc := IMAGE_IMPORT_DESCRIPTOR {
+		original_first_thunk: 0x2100   /* RVA to original unbound IAT */
+		time_date_stamp:      0x0000
+		forwarder_chain:      0x0000   /* -1 if no forwarders */
+		name:                 0x2100
+		first_thunk:          0x2100   /* RVA to IAT (if bound this IAT has actual addresses) */
+	}
+
+	null_import := IMAGE_IMPORT_DESCRIPTOR { }
+
+	kernel32_table := Import {
+		dll_name: "kernel32.dll"
+		api: ['ExitProcess']
+	}
+
+	msvcrt_table := Import {
+		dll_name: "msvcrt.dll"
+		api: ['printf', 'putch', 'malloc', 'free']
+	}
+
+	mut imports := []Import { }
+	imports << kernel32_table
+	imports << msvcrt_table
+
+	mut total_bytes := u32(0)
+	total_bytes += (sizeof(null_import))
+	for imp in imports {
+		total_bytes += sizeof(u64)
+		println('$imp.dll_name')
+		for api in imp.api {
+			println('$api')
+			total_bytes += sizeof(u64)
+		}
+		total_bytes += sizeof(u64) // null terminated
+		println('')
+	}
+	// total_bytes += (sizeof(null_import)) // null terminated struct
+
+	println('total_bytes: $total_bytes')
+
+	// dll_count = 2
 	// zero_buf := []int{ len: 64, init: 0 }
 	
 	f.write_bytes(&dos_header, 64)
@@ -226,6 +288,11 @@ fn main() {
 
 	zero_buf_200 := []int{ len: 0x200, init: 0 }
 	f.write_bytes(&zero_buf_200[0], zero_buf_200.len)
+
+	f.write_bytes(&kernel32_desc, int(sizeof(kernel32_desc)))
+	f.write_bytes(&msvcrt_desc, int(sizeof(msvcrt_desc)))
+	f.write_bytes(&null_import, int(sizeof(null_import)))
+
 	// f.write_bytes(&zero_buf_200[0], zero_buf_200.len)
 	// f.write_bytes(&zero_buf_200[0], zero_buf_200.len)
 
