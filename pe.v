@@ -1,6 +1,6 @@
 import os
 
-struct IMAGE_DOS_HEADER {  // DOS .EXE header
+struct ImageDosHeader {  // DOS .EXE header
 	e_magic      u16   // Magic number
 	e_cblp       u16   // bytes on last page of file
 	e_cp         u16   // Pages in file
@@ -22,13 +22,13 @@ struct IMAGE_DOS_HEADER {  // DOS .EXE header
 	e_lfanew     u32   // File address of new exe header
 }
 
-struct IMAGE_DATA_DIRECTORY {
+struct ImageDataDirectory {
 	virtual_address  u32
 	size             u32
 }
 
 // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_file_header
-struct IMAGE_FILE_HEADER {
+struct ImageFileHeader {
 	machine                  u16
 	number_of_sections       u16
 	time_date_stamp          u32
@@ -39,7 +39,7 @@ struct IMAGE_FILE_HEADER {
 }
 
 // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_optional_header64
-struct IMAGE_OPTIONAL_HEADER64 {
+struct ImageOptionalHeader64 {
 	magic                          u16
 	major_linker_version           byte
 	minor_linker_version           byte
@@ -69,17 +69,17 @@ struct IMAGE_OPTIONAL_HEADER64 {
 	size_of_heap_commit            u64
 	loader_flags                   u32
 	number_of_rva_and_sizes        u32
-	data_directory[16]             IMAGE_DATA_DIRECTORY
+	data_directory[16]             ImageDataDirectory
 }
 
-struct IMAGE_NT_HEADERS64 {
+struct ImageNtHeader64 {
 	signature        u32
-	file_header      IMAGE_FILE_HEADER
-	optional_header  IMAGE_OPTIONAL_HEADER64
+	file_header      ImageFileHeader
+	optional_header  ImageOptionalHeader64
 }
 
 // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_section_header
-struct IMAGE_SECTION_HEADER {
+struct ImageSectionHeader {
 	name[8]                 byte
 	virtual_size            u32
 	virtual_address         u32
@@ -92,7 +92,7 @@ struct IMAGE_SECTION_HEADER {
 	characteristics         u32
 }
 
-struct IMAGE_IMPORT_DESCRIPTOR {
+struct ImageImportDescriptor {
 pub mut:
 	original_first_thunk  u32   /* RVA to original unbound IAT */
 	time_date_stamp       u32
@@ -106,7 +106,7 @@ pub mut:
 	dll_name    string      // kernel32.dll, msvcrt.dll
 	dll_offset  int
 	api         map[string]int
-	import_desc &IMAGE_IMPORT_DESCRIPTOR
+	import_desc &ImageImportDescriptor
 	thunk_len   int
 }
 
@@ -115,7 +115,7 @@ const (
 )
 
 fn main() {
-	dos_header := IMAGE_DOS_HEADER {
+	dos_header := ImageDosHeader {
 		e_magic:  0x5A4D       // MZ
 		e_cblp: 0x90
 		e_cp: 0x03
@@ -126,14 +126,14 @@ fn main() {
 		e_lfanew: 0x80         // PE Header address
 	}
 
-	dos_stub := [byte(0x0E), 0x1F, 0xBA, 0x0E, 0x00, 0xB4, 0x09, 0xCD, 0x21, 
-		0xB8, 0x01, 0x4C, 0xCD, 0x21, 0x54, 0x68, 0x69, 0x73, 0x20, 0x70, 
+	dos_stub := [byte(0x0E), 0x1F, 0xBA, 0x0E, 0x00, 0xB4, 0x09, 0xCD, 0x21,
+		0xB8, 0x01, 0x4C, 0xCD, 0x21, 0x54, 0x68, 0x69, 0x73, 0x20, 0x70,
 		0x72, 0x6F, 0x67, 0x72, 0x61, 0x6D, 0x20, 0x63, 0x61, 0x6E, 0x6E,
-		0x6F, 0x74, 0x20, 0x62, 0x65, 0x20, 0x72, 0x75, 0x6E, 0x20, 0x69, 
-		0x6E, 0x20, 0x44, 0x4F, 0x53, 0x20, 0x6D, 0x6F, 0x64, 0x65, 0x2E, 
+		0x6F, 0x74, 0x20, 0x62, 0x65, 0x20, 0x72, 0x75, 0x6E, 0x20, 0x69,
+		0x6E, 0x20, 0x44, 0x4F, 0x53, 0x20, 0x6D, 0x6F, 0x64, 0x65, 0x2E,
 		0x0D, 0x0D, 0x0A, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 
-	optional_header := IMAGE_OPTIONAL_HEADER64 {
+	optional_header := ImageOptionalHeader64 {
 		magic: 0x020B  // PE64
 		major_linker_version: 0x06
 		size_of_code: 0x400
@@ -158,7 +158,7 @@ fn main() {
 		number_of_rva_and_sizes: 0x10
 	}
 
-	file_header := IMAGE_FILE_HEADER {
+	file_header := ImageFileHeader {
 		machine: 0x8664                        // x64
 		number_of_sections: number_of_sections // .text, .data, .idata
 		size_of_optional_header: u16(sizeof(optional_header))
@@ -166,7 +166,7 @@ fn main() {
 	}
 
 	// // V doesn't support embedded struct yet
-	// nt_header := IMAGE_NT_HEADERS64{
+	// nt_header := ImageNtHeader64{
 	// 	signature: 0x00004550  // PE00
 	// 	file_header: file_header
 	// 	optional_header: optional_header
@@ -177,10 +177,10 @@ fn main() {
 	mut f := os.create("a.exe") or {
 		panic(err)
 	}
-	
+
 	// code section
 	text := [`.`, `t`, `e`, `x`, `t`, 0, 0, 0]
-	text_header := IMAGE_SECTION_HEADER {
+	text_header := ImageSectionHeader {
 		// name: name
 		virtual_size: 0x1000
 		virtual_address: 0x1000
@@ -191,7 +191,7 @@ fn main() {
 	C.memcpy(text_header.name, &text[0], 8)
 
 	data := [`.`, `d`, `a`, `t`, `a`, 0, 0, 0]
-	data_header := IMAGE_SECTION_HEADER {
+	data_header := ImageSectionHeader {
 		// name: name
 		virtual_size: 0x1000
 		virtual_address: 0x2000
@@ -202,7 +202,7 @@ fn main() {
 	C.memcpy(data_header.name, &data[0], 8)
 
 	idata := [`.`, `i`,`d`, `a`, `t`, `a`, 0, 0]
-	idata_header := IMAGE_SECTION_HEADER {
+	idata_header := ImageSectionHeader {
 		// name: name
 		virtual_size: 0x1000
 		virtual_address: 0x3000
@@ -212,7 +212,7 @@ fn main() {
 	}
 	C.memcpy(idata_header.name, &idata[0], 8)
 
-	kernel32_desc := IMAGE_IMPORT_DESCRIPTOR {
+	kernel32_desc := ImageImportDescriptor {
 		original_first_thunk: 0x0000   /* RVA to original unbound IAT */
 		time_date_stamp:      0x0000
 		forwarder_chain:      0x0000   /* -1 if no forwarders */
@@ -220,7 +220,7 @@ fn main() {
 		first_thunk:          0x0000   /* RVA to IAT (if bound this IAT has actual addresses) */
 	}
 
-	msvcrt_desc := IMAGE_IMPORT_DESCRIPTOR {
+	msvcrt_desc := ImageImportDescriptor {
 		original_first_thunk: 0x0000   /* RVA to original unbound IAT */
 		time_date_stamp:      0x0000
 		forwarder_chain:      0x0000   /* -1 if no forwarders */
@@ -228,7 +228,7 @@ fn main() {
 		first_thunk:          0x0000   /* RVA to IAT (if bound this IAT has actual addresses) */
 	}
 
-	null_import := IMAGE_IMPORT_DESCRIPTOR { }
+	null_import := ImageImportDescriptor { }
 
 	mut kernel32 := ImportTable {
 		dll_name: "kernel32.dll"
@@ -252,7 +252,7 @@ fn main() {
 	imports << msvcrt
 
 	mut thunk_names := []byte { len: 128, init: 0}
-	
+
 	mut total_bytes := 0 // calculate thunks table len
 	mut total_thunk_len := u32(0)
 	mut offset := 0
@@ -284,14 +284,14 @@ fn main() {
 
 	for _, b in thunk_names {
 		if b == 0 {
-			print('_')	
+			print('_')
 		} else {
 			print('${b:c}')
 		}
 	}
 	print('\n')
 
-	buf := []byte{ len: 200, init: 0 } 
+	buf := []byte{ len: 200, init: 0 }
 	rva := u32(0x2000)
 	offset = 0
 
@@ -309,7 +309,7 @@ fn main() {
 		imports[i].import_desc.first_thunk = rva + first_thunk
 		imports[i].import_desc.original_first_thunk = rva + original_first_thunk
 		imports[i].import_desc.name = rva + name
-		
+
 		for _, v in imp.api {
 			t := u32(v) + imports[0].import_desc.name
 			C.memcpy(&buf[hint_offset + first_thunk], &t, 8)
@@ -333,14 +333,14 @@ fn main() {
 	// https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_data_directory
 	// TODO: calculate all address & size
 	import_table_dir_size := (imports.len * import_desc_len) + import_desc_len
-	import_table_dir := IMAGE_DATA_DIRECTORY {
+	import_table_dir := ImageDataDirectory {
 		virtual_address: rva
 		size: u32(import_table_dir_size)
 	}
 	C.memcpy(&optional_header.data_directory[1], &import_table_dir, sizeof(import_table_dir))
 
 	import_address_table_size := total_thunk_len * 8
-	import_address_table_dir := IMAGE_DATA_DIRECTORY {
+	import_address_table_dir := ImageDataDirectory {
 		virtual_address: imports[0].import_desc.first_thunk
 		size: u32(import_address_table_size)
 	}
